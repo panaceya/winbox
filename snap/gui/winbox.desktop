@@ -1,0 +1,11 @@
+[Desktop Entry]
+Categories=Wine;
+Comment=winbox Client
+Exec=${SNAP}/bin/winbox
+Icon=${SNAP}/meta/gui/icon.png
+Name=WinBox
+StartupNotify=true
+Terminal=false
+TerminalOptions=
+Type=Application
+X-KDE-SubstituteUID=false

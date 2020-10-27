@@ -1,0 +1,6 @@
+.*
+*.exe
+*.swp
+*.snap
+
+!.gitignore

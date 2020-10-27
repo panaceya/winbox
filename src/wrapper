@@ -1,0 +1,349 @@
+#!/usr/bin/env bash
+
+###########################
+# wine runtime selection #
+###########################
+
+if [ -d $SNAP/wine-runtime ]; then
+  WPR=$SNAP/wine-runtime
+  if [ ! -f $WPR/bin/wprfile ]; then
+    runtime_snap_name="$(
+        grep \
+            --extended-regexp \
+            'default-provider: *wine-platform-runtime' \
+            $SNAP/meta/snap.yaml \
+            | cut --delimiter=: --fields=2 \
+            | sed 's/^ *//' \
+            || true
+    )"
+
+    if test -n "${runtime_snap_name}"; then
+        echo "You need to connect this snap to the wine runtime snap."
+        echo ""
+        echo "You can do this with those commands:"
+        echo "snap install ${runtime_snap_name}"
+        echo "snap connect $SNAP_NAME:$(echo $runtime_snap_name | sed 's|-platform||g') ${runtime_snap_name}"
+        echo ""
+        exit 1
+    fi
+  fi
+fi
+
+###########################
+# WINE platform selection #
+###########################
+
+if [ -d $SNAP/wine-platform ]; then
+  WP=$SNAP/wine-platform
+  REL="$(
+      grep \
+            --extended-regexp \
+            'default-provider: *wine-platform-[[:digit:]]' \
+            $SNAP/meta/snap.yaml \
+            | cut --delimiter=: --fields=2 \
+            | sed 's/^ *//;s|-| |g' \
+            | awk '{print $4}'
+  )"
+
+  if [ ! -d $WP/wine-$REL ]; then
+    platform_snap_name="$(
+        grep \
+            --extended-regexp \
+            'default-provider: *wine-platform-[[:digit:]]' \
+            $SNAP/meta/snap.yaml \
+            | cut --delimiter=: --fields=2 \
+            | sed 's/^ *//' \
+            || true
+    )"
+
+    if test -n "${platform_snap_name}"; then
+        echo "You need to connect this snap to the wine platform snap."
+        echo ""
+        echo "You can do this with those commands:"
+        echo "snap install ${platform_snap_name}"
+        echo "snap connect $SNAP_NAME:$(echo $platform_snap_name | sed 's|-platform||g') ${platform_snap_name}"
+        echo ""
+        exit 1
+    fi
+  fi
+fi
+
+# wine base
+WINE_BASE=$WP/wine-$REL
+
+NEED_UPDATE=true
+if [ -f "$SNAP_USER_DATA/.revision" ]; then
+  SNAP_DESKTOP_LAST_REVISION=$(cat $SNAP_USER_DATA/.revision)
+
+  if [ "$SNAP_DESKTOP_LAST_REVISION" == "$SNAP_REVISION" ]; then
+    NEED_UPDATE=false
+  fi
+fi
+
+# Set $REALHOME to the users real home directory
+REALHOME=`getent passwd $UID | cut -d ':' -f 6`
+
+function prepend_dir() {
+  local var="$1"
+  local dir="$2"
+  if [ -d "$dir" ]; then
+    eval "export $var=\"\$dir\${$var:+:\$$var}\""
+  fi
+}
+
+function append_dir() {
+  local var="$1"
+  local dir="$2"
+  if [ -d "$dir" ]; then
+    eval "export $var=\"\${$var:+\$$var:}\$dir\""
+  fi
+}
+
+# async
+declare -A PIDS
+
+function async_exec() {
+  $@ &
+  PIDS[$!]=$@
+}
+
+function wait_for_async_execs() {
+  for i in ${!PIDS[@]}
+  do
+    wait $i && continue || echo "ERROR: ${PIDS[$i]} exited abnormally with status $?"
+  done
+}
+
+# ensure_dir_exists calls `mkdir -p` if the given path is not a directory.
+# This speeds up execution time by avoiding unnecessary calls to mkdir.
+#
+# Usage: ensure_dir_exists <path> [<mkdir-options>]...
+#
+function ensure_dir_exists() {
+  [ -d "$1" ] ||  mkdir -p "$@"
+}
+
+# On Fedora $SNAP is under /var and there is some magic to map it to /snap.
+# # We need to handle that case and reset $SNAP
+SNAP=`echo $SNAP | sed -e "s|/var/lib/snapd||g"`
+
+export GTK_MODULES=""
+
+if [ "$SNAP_ARCH" = "amd64" ]; then
+  export WINEARCH="win64"
+  export ARCH="x86_64-linux-gnu"
+  export WINBOX="winbox64.exe"
+elif [ "$SNAP_ARCH" = "i386" ]; then
+  export WINEARCH="win64"
+  export ARCH="i386-linux-gnu"
+  export WINBOX="winbox.exe"
+else
+  echo "Host architecture ($SNAP_ARCH) unsupported."
+  exit 1
+fi
+
+export WINEVERPATH=$WINE_BASE
+export WINESERVER=$WINE_BASE/bin/wineserver
+export WINELOADER=$WINE_BASE/bin/wine
+export WINEDLLPATH=$WINE_BASE/lib/wine/fakedlls
+export WINETRICKS=$WPR/bin/winetricks
+export WINEPREFIX=$SNAP_USER_COMMON/.wine
+export WINEDLLOVERRIDES="mscoree,mshtml="
+export WINEDEBUG=fixme-all
+export LD_LIBRARY_PATH="$WPR/lib:$WPR/lib/$ARCH:$WPR/usr/lib:$WPR/usr/lib/$ARCH:$LD_LIBRARY_PATH"
+export PATH=$PATH:$WPR/bin:$WPR/usr/bin:$WINE_BASE/bin
+
+if [ "$SNAP_ARCH" = "amd64" ]; then
+  append_dir LD_LIBRARY_PATH $WPR/lib64
+  append_dir LD_LIBRARY_PATH $WPR/lib/i386-linux-gnu
+  append_dir LD_LIBRARY_PATH $WPR/usr/lib/i386-linux-gnu
+fi
+
+# XKB config
+export XKB_CONFIG_ROOT=$WPR/usr/share/X11/xkb
+
+# Give XOpenIM a chance to locate locale data.
+# This is required for text input to work in SDL2 games.
+export XLOCALEDIR=$WPR/usr/share/X11/locale
+export LOCPATH=$WPR/usr/lib/locale
+
+# Set XCursors path
+export XCURSOR_PATH=$WPR/usr/share/icons
+prepend_dir XCURSOR_PATH $SNAP/data-dir/icons
+
+# SAMBA Libs for ntlm_auth to function
+append_dir LD_LIBRARY_PATH $WPR/usr/lib/$ARCH/samba
+[ "$SNAP_ARCH" = "amd64" ] && append_dir LD_LIBRARY_PATH $WPR/usr/lib/i386-linux-gnu/samba
+
+# Mesa Libs for OpenGL support
+append_dir LD_LIBRARY_PATH $WPR/usr/lib/$ARCH/mesa
+append_dir LD_LIBRARY_PATH $WPR/usr/lib/$ARCH/mesa-egl
+[ "$SNAP_ARCH" = "amd64" ] && append_dir LD_LIBRARY_PATH $WPR/usr/lib/i386-linux-gnu/mesa
+[ "$SNAP_ARCH" = "amd64" ] && append_dir LD_LIBRARY_PATH $WPR/usr/lib/i386-linux-gnu/mesa-egl
+
+# Tell libGL and libva where to find the drivers
+export LIBGL_DRIVERS_PATH=$WPR/usr/lib/$ARCH/dri
+[ "$SNAP_ARCH" = "amd64" ] && append_dir LIBGL_DRIVERS_PATH $WPR/usr/lib/i386-linux-gnu/dri
+append_dir LD_LIBRARY_PATH $LIBGL_DRIVERS_PATH
+export LIBVA_DRIVERS_PATH=$WPR/usr/lib/$ARCH/dri
+[ "$SNAP_ARCH" = "amd64" ] && append_dir LIBVA_DRIVERS_PATH $WPR/usr/lib/i386-linux-gnu/dri
+
+# Workaround in snapd for proprietary nVidia drivers mounts the drivers in
+# /var/lib/snapd/lib/gl that needs to be in LD_LIBRARY_PATH
+# Without that OpenGL using apps do not work with the nVidia drivers.
+# Ref.: https://bugs.launchpad.net/snappy/+bug/1588192
+append_dir LD_LIBRARY_PATH /var/lib/snapd/lib/gl
+
+# Pulseaudio export
+append_dir LD_LIBRARY_PATH $WPR/usr/lib/$ARCH/pulseaudio
+[ "$SNAP_ARCH" = "amd64" ] && append_dir LD_LIBRARY_PATH $WPR/usr/lib/i386-linux-gnu/pulseaudio
+
+# Alsa export
+export ALSA_CONFIG_PATH="$WPR/usr/share/alsa/alsa.conf"
+
+# EGL vendor files on glvnd enabled systems
+[ -d /var/lib/snapd/lib/glvnd/egl_vendor.d ] && \
+append_dir __EGL_VENDOR_LIBRARY_DIRS /var/lib/snapd/lib/glvnd/egl_vendor.d
+
+# Tell GStreamer where to find its plugins
+export GST_PLUGIN_PATH=$WPR/usr/lib/$ARCH/gstreamer-1.0
+export GST_PLUGIN_SYSTEM_PATH=$WPR/usr/lib/$ARCH/gstreamer-1.0
+# gst plugin scanner doesn't install in the correct path: https://github.com/ubuntu/snapcraft-desktop-helpers/issues/43
+export GST_PLUGIN_SCANNER=$WPR/usr/lib/$ARCH/gstreamer1.0/gstreamer-1.0/gst-plugin-scanner
+
+# XDG Config
+prepend_dir XDG_CONFIG_DIRS $WPR/etc/xdg
+
+# Define snaps' own data dir
+prepend_dir XDG_DATA_DIRS $SNAP/share
+prepend_dir XDG_DATA_DIRS $WPR/usr/share
+prepend_dir XDG_DATA_DIRS $SNAP_USER_COMMON
+prepend_dir XDG_DATA_DIRS $SNAP_USER_DATA
+
+export HOME=$SNAP_USER_COMMON
+
+# Set XDG_DATA_HOME to local path
+export XDG_DATA_HOME=$SNAP_USER_COMMON/.local/share
+ensure_dir_exists $XDG_DATA_HOME
+
+# Workaround for GLib < 2.53.2 not searching for schemas in $XDG_DATA_HOME:
+#   https://bugzilla.gnome.org/show_bug.cgi?id=741335
+prepend_dir XDG_DATA_DIRS $XDG_DATA_HOME
+
+# Set cache folder to local path
+export XDG_CACHE_HOME=$SNAP_USER_COMMON/.cache
+ensure_dir_exists $XDG_CACHE_HOME
+
+# Set config folder to local path
+export XDG_CONFIG_HOME=$SNAP_USER_COMMON/.config
+ensure_dir_exists $XDG_CONFIG_HOME
+
+# Create $XDG_RUNTIME_DIR if not exists (to be removed when LP: #1656340 is fixed)
+[ -n "$XDG_RUNTIME_DIR" ] && ensure_dir_exists $XDG_RUNTIME_DIR -m 700
+
+# Make PulseAudio socket available inside the snap-specific $XDG_RUNTIME_DIR
+if [ -n "$XDG_RUNTIME_DIR" ]; then
+    pulsenative="pulse/native"
+    pulseaudio_sockpath="$XDG_RUNTIME_DIR/../$pulsenative"
+    if [ -S "$pulseaudio_sockpath" ]; then
+        export PULSE_SERVER="unix:${pulseaudio_sockpath}"
+    fi
+fi
+
+# Keep an array of data dirs, for looping through them
+IFS=':' read -r -a data_dirs_array <<< "$XDG_DATA_DIRS"
+
+# Font Config
+export FONTCONFIG_PATH=$WPR/etc/fonts
+export FONTCONFIG_FILE=$WPR/etc/fonts/fonts.conf
+
+function make_user_fontconfig {
+  echo "<fontconfig>"
+  if [ -d $REALHOME/.local/share/fonts ]; then
+    echo "  <dir>$REALHOME/.local/share/fonts</dir>"
+  fi
+  if [ -d $REALHOME/.fonts ]; then
+    echo "  <dir>$REALHOME/.fonts</dir>"
+  fi
+  for ((i = 0; i < ${#data_dirs_array[@]}; i++)); do
+    if [ -d "${data_dirs_array[$i]}/fonts" ]; then
+      echo "  <dir>${data_dirs_array[$i]}/fonts</dir>"
+    fi
+  done
+  echo '  <include ignore_missing="yes">conf.d</include>'
+  # We need to include this default cachedir first so that caching
+  # works: without it, fontconfig will try to write to the real user home
+  # cachedir and be blocked by AppArmor.
+  echo '  <cachedir prefix="xdg">fontconfig</cachedir>'
+  if [ -d $REALHOME/.cache/fontconfig ]; then
+    echo "  <cachedir>$REALHOME/.cache/fontconfig</cachedir>"
+  fi
+  echo "</fontconfig>"
+}
+
+if [ $NEED_UPDATE = true ]; then
+  rm -rf $XDG_DATA_HOME/{fontconfig,fonts,fonts-*,themes,.themes}
+
+  # This fontconfig fragment is installed in a location that is
+  # included by the system fontconfig configuration: namely the
+  # etc/fonts/conf.d/50-user.conf file.
+  ensure_dir_exists $XDG_CONFIG_HOME/fontconfig
+  async_exec make_user_fontconfig > $XDG_CONFIG_HOME/fontconfig/fonts.conf
+fi
+
+# Gdk-pixbuf loaders
+export GDK_PIXBUF_MODULE_FILE=$XDG_CACHE_HOME/gdk-pixbuf-loaders.cache
+export GDK_PIXBUF_MODULEDIR=$WPR/usr/lib/$ARCH/gdk-pixbuf-2.0/2.10.0/loaders
+
+if [ $NEED_UPDATE = true ]; then
+  rm -f $GDK_PIXBUF_MODULE_FILE
+  if [ -f $WPR/usr/lib/$ARCH/gdk-pixbuf-2.0/gdk-pixbuf-query-loaders ] && [ ! -f "${GDK_PIXBUF_MODULE_FILE}" ]; then
+    async_exec $WPR/usr/lib/$ARCH/gdk-pixbuf-2.0/gdk-pixbuf-query-loaders > $GDK_PIXBUF_MODULE_FILE
+  fi
+fi
+
+
+# link ttf & ttc fonts from root to wineprefix
+ensure_dir_exists $WINEPREFIX/drive_c/windows/Fonts
+find /usr/share/fonts/ -type f \( -name "*.ttf" -o -name "*.ttc" \) -exec ln -vs "{}" $WINEPREFIX/drive_c/windows/Fonts/ \; &>/dev/null
+
+# Stop WINE from updating $WINEPREFIX automatically
+if [ -f $WINEPREFIX/.update-timestamp ]; then
+chkstmp=$(cat $WINEPREFIX/.update-timestamp | grep disable | wc -l)
+    if [ $chkstmp -eq 0 ]; then
+        echo "disable" > "$WINEPREFIX/.update-timestamp"
+    fi
+fi
+
+wait_for_async_execs
+
+if [ "$NEED_UPDATE" == "true" ]; then
+  wine wineboot --init 2>&1 | \
+    yad --progress --title="Preparing wine environment" \
+      --width=400 --center --no-buttons --auto-close --auto-kill --on-top --pulsate
+
+  echo "$SNAP_REVISION" > $SNAP_USER_DATA/.revision
+else
+  notify-send --icon "${SNAP}/meta/gui/icon.png" --expire-time=15000 "Winbox" "Winbox now is starting..."
+fi
+
+
+# Switches: use -something instead of /something to avoid confusion with Unix paths
+# Also convert Unix paths to Windows paths.
+declare -a args
+
+for arg; do
+    if [[ "${arg:0:1}" = "-" ]]; then
+        args+=("${arg/#-//}")
+    else
+        args+=("$(winepath -w "$arg")")
+    fi
+done
+
+if [ "$1" == "winbox" ]; then
+  wine start /unix "$SNAP/usr/libexec/$WINBOX" "$@"
+elif [ "$1" == "winecfg" ]; then
+  wine winecfg
+else
+  wine start /unix "$SNAP/usr/libexec/$WINBOX" "$@"
+fi
