@@ -51,15 +51,15 @@ parts:
         wget -O winbox32.exe "https://download.mikrotik.com/winbox/${SNAPCRAFT_PROJECT_VERSION}/winbox.exe"
         wget -O winbox64.exe "https://download.mikrotik.com/winbox/${SNAPCRAFT_PROJECT_VERSION}/winbox64.exe"
 
-        install -o root -D src/wrapper $SNAPCRAFT_PRIME/bin/wrapper
+        install -o root -D src/wrapper $SNAPCRAFT_PRIME/winbox
         install -o root -D snap/gui/winbox.desktop $SNAPCRAFT_PRIME/winbox.desktop
         install -o root -D winbox32.exe $SNAPCRAFT_PRIME/usr/libexec/winbox32.exe
         install -o root -D winbox64.exe $SNAPCRAFT_PRIME/usr/libexec/winbox64.exe
-
         snapcraftctl set-version "${SNAPCRAFT_PROJECT_VERSION}+git"
 apps:
+
   winbox:
-    command: $SNAP/bin/wrapper
+    command: winbox
     autostart: winbox.desktop
     desktop: winbox.desktop
     environment:
@@ -69,19 +69,14 @@ apps:
       TMPDIR: $XDG_RUNTIME_DIR
       XDG_CURRENT_DESKTOP: Unity
       DISABLE_WAYLAND: 1
-
     plugs:
       - desktop
-      - desktop-legacy
-      - hardware-observe
       - home
       - network
-      - network-bind
-      - opengl
-      - process-control
       - pulseaudio
       - wayland
-      - x11
       - icon-themes
+      - removable-media
       - wine-runtime
       - wine-5-stable
+      - x11

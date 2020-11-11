@@ -1,11 +1,17 @@
 [Desktop Entry]
-Categories=Wine;
+Categories=Utility;
+Comment[en_US]=winbox Client
 Comment=winbox Client
-Exec=${SNAP}/bin/winbox
+GenericName[en_US]=WinBox
+GenericName=WinBox
 Icon=${SNAP}/meta/gui/icon.png
+Exec=winbox
+Name[en_US]=WinBox
 Name=WinBox
-StartupNotify=true
-Terminal=false
-TerminalOptions=
-Type=Application
+X-DBUS-StartupType=multi
 X-KDE-SubstituteUID=false
+X-SnapInstanceName=winbox
+Keywords=winebox;mikrotik;
+StartupNotify=false
+Terminal=false
+Type=Application
