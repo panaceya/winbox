@@ -73,6 +73,7 @@ apps:
       - desktop
       - home
       - network
+      - network-bind
       - pulseaudio
       - wayland
       - icon-themes
