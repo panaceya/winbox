@@ -76,12 +76,6 @@ if [ -f "$SNAP_USER_DATA/.revision" ]; then
   unlink $SNAP_USER_DATA/.revision
 fi
 
-if [ -f "$SNAP_USER_DATA/.version" ]; then
-  if [ "$(wine --version)" == "$(cat $SNAP_USER_DATA/.version)" ]; then
-    NEED_UPDATE=false
-  fi
-fi
-
 # Set $REALHOME to the users real home directory
 REALHOME=`getent passwd $UID | cut -d ':' -f 6`
 
@@ -282,6 +276,12 @@ function make_user_fontconfig {
   fi
   echo "</fontconfig>"
 }
+
+if [ -f "$SNAP_USER_DATA/.version" ]; then
+  if [ "$(wine --version)" == "$(cat $SNAP_USER_DATA/.version)" ]; then
+    NEED_UPDATE=false
+  fi
+fi
 
 if [ $NEED_UPDATE = true ]; then
   rm -rf $XDG_DATA_HOME/{fontconfig,fonts,fonts-*,themes,.themes}
