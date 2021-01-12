@@ -73,9 +73,11 @@ WINE_BASE=$WP/wine-$REL
 
 NEED_UPDATE=true
 if [ -f "$SNAP_USER_DATA/.revision" ]; then
-  SNAP_DESKTOP_LAST_REVISION=$(cat $SNAP_USER_DATA/.revision)
+  unlink $SNAP_USER_DATA/.revision
+fi
 
-  if [ "$SNAP_DESKTOP_LAST_REVISION" == "$SNAP_REVISION" ]; then
+if [ -f "$SNAP_USER_DATA/.version" ]; then
+  if [ "$(wine --version)" == "$(cat $SNAP_USER_DATA/.version)" ]; then
     NEED_UPDATE=false
   fi
 fi
@@ -134,9 +136,9 @@ if [ "$SNAP_ARCH" = "amd64" ]; then
   export ARCH="x86_64-linux-gnu"
   export WINBOX="winbox64.exe"
 elif [ "$SNAP_ARCH" = "i386" ]; then
-  export WINEARCH="win64"
+  export WINEARCH="win32"
   export ARCH="i386-linux-gnu"
-  export WINBOX="winbox.exe"
+  export WINBOX="winbox32.exe"
 else
   echo "Host architecture ($SNAP_ARCH) unsupported."
   exit 1
@@ -322,7 +324,7 @@ if [ "$NEED_UPDATE" == "true" ]; then
     yad --progress --title="Preparing wine environment" \
       --width=400 --center --no-buttons --auto-close --auto-kill --on-top --pulsate
 
-  echo "$SNAP_REVISION" > $SNAP_USER_DATA/.revision
+   wine --version > $SNAP_USER_DATA/.version
 else
   notify-send --icon "${SNAP}/meta/gui/icon.png" --expire-time=15000 "Winbox" "Winbox now is starting..."
 fi
