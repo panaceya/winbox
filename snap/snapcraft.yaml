@@ -13,7 +13,9 @@ confinement: strict
 
 architectures:
   - build-on: amd64
-    run-on: [amd64, i386]
+    run-on: amd64
+  - build-on: i386
+    run-on: i386
 
 plugs:
   wine-runtime:
