@@ -1,5 +1,6 @@
 [Desktop Entry]
 Categories=Utility;
+StartupWMClass=winbox.exe
 Comment[en_US]=winbox Client
 Comment=winbox Client
 GenericName[en_US]=WinBox
