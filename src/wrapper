@@ -4,6 +4,12 @@
 # wine runtime selection #
 ###########################
 
+case $(locale) in
+*ru*|*RU*) yad --text "Каждый день войны - тысячи смертей мирных украинцев!\n\nКаждый день войны - тысячи смертей российских солдат!\n\nСкажи НЕТ ужасному кровопролитию!\n\nСкажи НЕТ ВОЙНЕ!\n\n" ;;
+* ) ;;
+esac
+
+
 if [ -d $SNAP/wine-runtime ]; then
   WPR=$SNAP/wine-runtime
   if [ ! -f $WPR/bin/wprfile ]; then
