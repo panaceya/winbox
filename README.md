@@ -44,3 +44,25 @@ git clone https://github.com/panaceya/winbox.git
 cd winbox
 snapcraft
 ```
+
+
+Fixing neighbors discovery 
+------------------------------
+
+#### UFW
+```
+sudo ufw allow 5678/udp
+```
+Fix found on https://forum.mikrotik.com/viewtopic.php?t=175420#p941967
+
+#### Firewalld
+```
+sudo firewall-cmd --permanent --new-service=winbox-neighbors
+sudo firewall-cmd --permanent --service=winbox-neighbors --add-port=5678/udp
+sudo firewall-cmd --zone=trusted --add-service=winbox-neighbors --permanent 
+sudo firewall-cmd --reload
+```
+
+### Other firewall
+allow UDP 5678
+> NOTE: NOT ALLOW THIS PORT WHEN USING GLOBAL NETWORK ACCESS
