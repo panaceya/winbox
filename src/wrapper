@@ -348,10 +348,8 @@ for arg; do
     fi
 done
 
-if [ "$1" == "winbox" ]; then
-  wine start /unix "$SNAP/usr/libexec/$WINBOX" "$@"
-elif [ "$1" == "winecfg" ]; then
+if [ "$1" == "winecfg" ]; then
   wine winecfg
 else
-  wine start /unix "$SNAP/usr/libexec/$WINBOX" "$@"
+  cp "$SNAP"/usr/libexec/winbox{32,64}.exe "$TMPDIR/" && wine start /unix "$TMPDIR/$WINBOX" "$@"
 fi
