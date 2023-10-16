@@ -1,6 +1,6 @@
 name: winbox
 base: core18
-version: '3.39'
+version: '3.40'
 summary: small utility that allows administration of MikroTik RouterOS
 icon: snap/gui/icon.png
 description: |
