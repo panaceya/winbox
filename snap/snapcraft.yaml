@@ -1,5 +1,5 @@
 name: winbox
-base: core18
+base: core20
 version: '3.40'
 summary: small utility that allows administration of MikroTik RouterOS
 icon: snap/gui/icon.png
@@ -14,23 +14,23 @@ compression: lzo
 
 architectures:
   - build-on: amd64
-    run-on: amd64
-  - build-on: i386
-    run-on: i386
 
 plugs:
-  wine-runtime:
+  wine-runtime-c20:
     interface: content
     target: $SNAP/wine-runtime
-    default-provider: wine-platform-runtime
-  wine-5-stable:
+    default-provider: wine-platform-runtime-core20
+
+  wine-7-stable:
     interface: content
     target: $SNAP/wine-platform
-    default-provider: wine-platform-5-stable
+    default-provider: wine-platform-7-stable-core20
+
   icon-themes:
     interface: content
     target: $SNAP/data-dir/icons
     default-provider: gtk-common-themes
+    
   gtk-3-themes:
     interface: content
     default-provider: gtk-common-themes
@@ -45,27 +45,31 @@ parts:
     stage-packages:
       - yad
       - libfreetype6
-
     build-packages:
       - wget
     prime:
       - -README*
     override-build: |
-        wget -O winbox32.exe "https://download.mikrotik.com/winbox/${SNAPCRAFT_PROJECT_VERSION}/winbox.exe"
-        wget -O winbox64.exe "https://download.mikrotik.com/winbox/${SNAPCRAFT_PROJECT_VERSION}/winbox64.exe"
+      wget -O $SNAPCRAFT_PRIME/usr/libexec/winbox64.exe "https://download.mikrotik.com/routeros/winbox/${SNAPCRAFT_PROJECT_VERSION}/winbox64.exe"         
+      install -o root -D src/wrapper $SNAPCRAFT_PRIME/winbox
+      install -o root -D snap/gui/winbox.desktop $SNAPCRAFT_PRIME/winbox.desktop
 
-        install -o root -D src/wrapper $SNAPCRAFT_PRIME/winbox
-        install -o root -D snap/gui/winbox.desktop $SNAPCRAFT_PRIME/winbox.desktop
-        install -o root -D winbox32.exe $SNAPCRAFT_PRIME/usr/libexec/winbox32.exe
-        install -o root -D winbox64.exe $SNAPCRAFT_PRIME/usr/libexec/winbox64.exe
-        snapcraftctl set-version "${SNAPCRAFT_PROJECT_VERSION}+git"
+  sommelier-core:
+    plugin: make
+    source: https://github.com/snapcrafters/sommelier-core.git
+    source-branch: "master"
+    build-packages:
+      - libc6-dev-i386
+      - gcc-multilib
+
 apps:
-
   winbox:
+    extensions: [ gnome-3-38 ]
     command: winbox
     autostart: winbox.desktop
     desktop: winbox.desktop
     environment:
+      NO_AT_BRIDGE: "1"
       WINEPREFIX: "$SNAP_USER_COMMON/.wine"
       LC_ALL: "C.UTF-8"
       HOME: $SNAP_USER_COMMON
@@ -73,14 +77,15 @@ apps:
       XDG_CURRENT_DESKTOP: Unity
       DISABLE_WAYLAND: 1
     plugs:
+      - opengl
       - desktop
       - home
       - network
       - network-bind
-      - pulseaudio
+      - network-observe
       - wayland
       - icon-themes
       - removable-media
-      - wine-runtime
-      - wine-5-stable
+      - wine-7-stable
+      - wine-runtime-c20
       - x11
