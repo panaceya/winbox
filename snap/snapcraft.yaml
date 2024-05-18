@@ -30,7 +30,7 @@ plugs:
     interface: content
     target: $SNAP/data-dir/icons
     default-provider: gtk-common-themes
-    
+
   gtk-3-themes:
     interface: content
     default-provider: gtk-common-themes
@@ -50,7 +50,8 @@ parts:
     prime:
       - -README*
     override-build: |
-      wget -O $SNAPCRAFT_PRIME/usr/libexec/winbox64.exe "https://download.mikrotik.com/routeros/winbox/${SNAPCRAFT_PROJECT_VERSION}/winbox64.exe"         
+      wget -O winbox64.exe "https://download.mikrotik.com/routeros/winbox/${SNAPCRAFT_PROJECT_VERSION}/winbox64.exe"
+      install -o root -D winbox64.exe $SNAPCRAFT_PRIME/usr/libexec/winbox64.exe
       install -o root -D src/wrapper $SNAPCRAFT_PRIME/winbox
       install -o root -D snap/gui/winbox.desktop $SNAPCRAFT_PRIME/winbox.desktop
 
