@@ -90,3 +90,20 @@ apps:
       - wine-7-stable
       - wine-runtime-c20
       - x11
+
+  # The wine command can be used to run applications inside the wine
+  # environment that this snap uses.
+  #
+  # For example, users can configure the wine environment of this snap
+  # by running `myapp.wine winecfg`.
+  wine:
+    extensions: [gnome-3-38]
+    command: bin/sommelier
+    plugs:
+      - opengl
+      - desktop
+      - home
+      - network
+      - wayland
+      - removable-media
+      - x11

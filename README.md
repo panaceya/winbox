@@ -69,3 +69,9 @@ sudo firewall-cmd --reload
 ### Other firewall
 allow UDP 5678
 > NOTE: NOT ALLOW THIS PORT WHEN USING GLOBAL NETWORK ACCESS
+
+Fixing font size/DPI in high resolution displays
+------------------------------------------------
+Run in terminal `winbox.wine winecfg`
+
+The Wine configuration settings window would show up. Now navigate to the Graphics tab. Adjust the dpi slider under the Screen Resolution setting & click OK to apply. Now relauch Winbox to check how it looks.
